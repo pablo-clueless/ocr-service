@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Heirs OCR · Admin</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- Login -->
+    <main id="login" class="login hidden">
+      <form id="login-form" class="login-card">
+        <h1>Heirs OCR</h1>
+        <p class="muted">Admin console</p>
+        <label>Email<input type="email" id="login-email" autocomplete="username" required /></label>
+        <label>Password<input type="password" id="login-password" autocomplete="current-password" required /></label>
+        <button type="submit" class="primary">Sign in</button>
+        <p id="login-error" class="error" role="alert"></p>
+      </form>
+    </main>
+
+    <!-- App shell -->
+    <div id="app" class="app hidden">
+      <header class="topbar">
+        <div class="brand">Heirs OCR <span class="tag">admin</span></div>
+        <nav class="tabs" id="tabs">
+          <button data-tab="observability" class="active">Observability</button>
+          <button data-tab="tenants" data-role="manager">Tenants</button>
+          <button data-tab="admins" data-role="owner">Admins</button>
+        </nav>
+        <div class="who">
+          <span id="who-name" class="muted"></span>
+          <button id="logout" class="ghost">Sign out</button>
+        </div>
+      </header>
+
+      <!-- Observability -->
+      <section data-view="observability" class="view">
+        <div class="view-head">
+          <h2>Observability</h2>
+          <button id="refresh" class="ghost">Refresh</button>
+        </div>
+        <div id="stat-tiles" class="tiles"></div>
+        <div class="grid2">
+          <div class="panel">
+            <h3>Health &amp; providers</h3>
+            <div id="health"></div>
+          </div>
+          <div class="panel">
+            <h3>Queue</h3>
+            <div id="queue"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Per-tenant usage</h3>
+          <div id="usage" class="table-wrap"></div>
+        </div>
+        <div class="panel">
+          <h3>By function</h3>
+          <div id="by-function" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <!-- Tenants -->
+      <section data-view="tenants" class="view hidden">
+        <div class="view-head">
+          <h2>Tenants</h2>
+          <button id="new-tenant" class="primary" data-role="manager">New tenant</button>
+        </div>
+        <div id="tenants" class="table-wrap"></div>
+      </section>
+
+      <!-- Admins -->
+      <section data-view="admins" class="view hidden">
+        <div class="view-head">
+          <h2>Admin users</h2>
+          <button id="new-admin" class="primary">New admin</button>
+        </div>
+        <div id="admins" class="table-wrap"></div>
+      </section>
+    </div>
+
+    <!-- Modal host -->
+    <div id="modal-root"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
