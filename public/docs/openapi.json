@@ -1,0 +1,878 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Heirs OCR Service",
+    "version": "1.0.0",
+    "description": "Comprehensive API documentation for Heirs OCR Service. This API provides a single endpoint for OCR processing with multiple function types, each with its own payload schema. Supported functions: TEXT_EXTRACTION, DOCUMENT_CLASSIFICATION, SIGNING, ID_VERIFICATION, FORM_DATA_EXTRACTION, RECEIPT_PARSING.",
+    "contact": {
+      "name": "Heirs Technologies",
+      "email": "support@heirstechnologies.com"
+    },
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Development Server"
+    },
+    {
+      "url": "",
+      "description": "Production Server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "OCR",
+      "description": "Document OCR processing operations"
+    }
+  ],
+  "paths": {
+    "/api/ocr": {
+      "post": {
+        "tags": ["OCR"],
+        "summary": "Process a document with OCR",
+        "description": "Upload a document file and specify which OCR function to run. Send `function`, `fields`, and optionally `comparisonData` as separate form fields.",
+        "operationId": "processOcr",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file", "function", "fields"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The document file to process. Max size: 10 MB. Allowed types: application/pdf, image/png, image/jpeg, image/tiff, image/webp."
+                  },
+                  "function": {
+                    "type": "string",
+                    "enum": [
+                      "TEXT_EXTRACTION",
+                      "SIGNING",
+                      "ID_VERIFICATION",
+                      "DOCUMENT_CLASSIFICATION",
+                      "FORM_DATA_EXTRACTION",
+                      "RECEIPT_PARSING"
+                    ],
+                    "description": "The OCR function to execute."
+                  },
+                  "fields": {
+                    "type": "string",
+                    "description": "JSON string with function-specific fields.\n\n**Per function:**\n- `TEXT_EXTRACTION`: `{\"language\": \"eng\"}` (optional, defaults to eng)\n- `SIGNING`: `{\"signerName\": \"John Doe\", \"expectedDate\": \"15/01/2026\"}` (signerName required)\n- `ID_VERIFICATION`: `{\"documentType\": \"passport\"}` (required, one of: national_id, passport, drivers_license)\n- `DOCUMENT_CLASSIFICATION`: `{\"expectedType\": \"code_of_conduct\"}` (optional)\n- `FORM_DATA_EXTRACTION`: `{\"targetFields\": [\"Name\", \"Email\"]}` (optional)\n- `RECEIPT_PARSING`: `{\"currency\": \"NGN\"}` (optional)",
+                    "example": "{\"language\": \"eng\"}"
+                  },
+                  "comparisonData": {
+                    "type": "string",
+                    "description": "Optional JSON string with data to compare against extracted results. Only applicable to SIGNING and ID_VERIFICATION.\n\n**SIGNING**: `{\"name\": \"John Doe\", \"date\": \"15/01/2026\"}` (name required)\n\n**ID_VERIFICATION**: `{\"fullName\": \"Jane Smith\", \"dateOfBirth\": \"15/03/1990\", \"idNumber\": \"A12345678\"}` (fullName required)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OCR processing completed successfully. The `data.result` schema varies by function.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "SIGNING completed successfully."
+                    },
+                    "data": {
+                      "oneOf": [
+                        { "$ref": "#/components/schemas/SigningResponseData" },
+                        { "$ref": "#/components/schemas/IdVerificationResponseData" },
+                        { "$ref": "#/components/schemas/DocumentClassificationResponseData" },
+                        { "$ref": "#/components/schemas/FormDataExtractionResponseData" },
+                        { "$ref": "#/components/schemas/ReceiptParsingResponseData" },
+                        { "$ref": "#/components/schemas/TextExtractionResponseData" }
+                      ],
+                      "discriminator": {
+                        "propertyName": "function"
+                      }
+                    }
+                  }
+                },
+                "examples": {
+                  "TEXT_EXTRACTION": {
+                    "summary": "Text extraction response",
+                    "value": {
+                      "success": true,
+                      "message": "TEXT_EXTRACTION completed successfully.",
+                      "data": {
+                        "function": "TEXT_EXTRACTION",
+                        "result": {
+                          "text": "This is the extracted text content from the document...",
+                          "pages": 2,
+                          "extractionMethod": "text"
+                        }
+                      }
+                    }
+                  },
+                  "SIGNING": {
+                    "summary": "Signing verification response",
+                    "value": {
+                      "success": true,
+                      "message": "SIGNING completed successfully.",
+                      "data": {
+                        "function": "SIGNING",
+                        "result": {
+                          "signatureDetected": true,
+                          "signatureConfidence": 0.85,
+                          "signerNameFound": true,
+                          "dateFound": true,
+                          "extractedSignerName": "John Doe",
+                          "extractedDate": "15/01/2026",
+                          "comparisonResult": {
+                            "nameMatch": true,
+                            "dateMatch": true,
+                            "overallMatch": true
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "ID_VERIFICATION": {
+                    "summary": "ID verification response",
+                    "value": {
+                      "success": true,
+                      "message": "ID_VERIFICATION completed successfully.",
+                      "data": {
+                        "function": "ID_VERIFICATION",
+                        "result": {
+                          "extractedName": "Jane Smith",
+                          "extractedDateOfBirth": "15/03/1990",
+                          "extractedIdNumber": "A12345678",
+                          "extractedDocumentType": "passport",
+                          "rawText": "PASSPORT ... Name: Jane Smith ...",
+                          "comparisonResult": {
+                            "nameMatch": true,
+                            "dobMatch": true,
+                            "idNumberMatch": true,
+                            "overallMatch": true
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "DOCUMENT_CLASSIFICATION": {
+                    "summary": "Document classification response",
+                    "value": {
+                      "success": true,
+                      "message": "DOCUMENT_CLASSIFICATION completed successfully.",
+                      "data": {
+                        "function": "DOCUMENT_CLASSIFICATION",
+                        "result": {
+                          "detectedType": "code_of_conduct",
+                          "confidence": 0.71,
+                          "matchedKeywords": [
+                            "code of conduct",
+                            "professional standards",
+                            "academic integrity",
+                            "misconduct",
+                            "ethical"
+                          ],
+                          "pages": 3,
+                          "extractionMethod": "text"
+                        }
+                      }
+                    }
+                  },
+                  "FORM_DATA_EXTRACTION": {
+                    "summary": "Form data extraction response",
+                    "value": {
+                      "success": true,
+                      "message": "FORM_DATA_EXTRACTION completed successfully.",
+                      "data": {
+                        "function": "FORM_DATA_EXTRACTION",
+                        "result": {
+                          "fields": {
+                            "Name": "John Doe",
+                            "Email": "john@example.com",
+                            "Phone": "+234 800 000 0000"
+                          },
+                          "rawText": "Name: John Doe\nEmail: john@example.com\nPhone: +234 800 000 0000",
+                          "pages": 1,
+                          "extractionMethod": "text"
+                        }
+                      }
+                    }
+                  },
+                  "RECEIPT_PARSING": {
+                    "summary": "Receipt parsing response",
+                    "value": {
+                      "success": true,
+                      "message": "RECEIPT_PARSING completed successfully.",
+                      "data": {
+                        "function": "RECEIPT_PARSING",
+                        "result": {
+                          "vendor": "ABC Store",
+                          "date": "15/01/2026",
+                          "totalAmount": "25,000.00",
+                          "currency": "NGN",
+                          "lineItems": [
+                            { "description": "Item A", "amount": "15,000.00" },
+                            { "description": "Item B", "amount": "10,000.00" }
+                          ],
+                          "taxAmount": "1,875.00",
+                          "rawText": "ABC Store\nDate: 15/01/2026\n..."
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request. File missing, payload missing, invalid JSON, or invalid function name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missingFile": {
+                    "summary": "No file uploaded",
+                    "value": {
+                      "success": false,
+                      "message": "File is required. Send a file in the 'file' form field.",
+                      "data": null
+                    }
+                  },
+                  "missingFields": {
+                    "summary": "Missing required form fields",
+                    "value": {
+                      "success": false,
+                      "message": "'function' and 'fields' are required in the form body.",
+                      "data": null
+                    }
+                  },
+                  "invalidFieldsJson": {
+                    "summary": "Malformed JSON in fields",
+                    "value": {
+                      "success": false,
+                      "message": "'fields' must be a valid JSON string.",
+                      "data": null
+                    }
+                  },
+                  "invalidFunction": {
+                    "summary": "Unknown function name",
+                    "value": {
+                      "success": false,
+                      "message": "Invalid function 'UNKNOWN'. Must be one of: SIGNING, ID_VERIFICATION, DOCUMENT_CLASSIFICATION, FORM_DATA_EXTRACTION, RECEIPT_PARSING, TEXT_EXTRACTION",
+                      "data": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed. The payload fields did not pass function-specific validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Validation failed."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "examples": {
+                  "signingValidation": {
+                    "summary": "Missing signer name for SIGNING",
+                    "value": {
+                      "success": false,
+                      "message": "Validation failed.",
+                      "data": {
+                        "errors": ["fields.signerName is required and must be a string"]
+                      }
+                    }
+                  },
+                  "idVerificationValidation": {
+                    "summary": "Invalid document type for ID_VERIFICATION",
+                    "value": {
+                      "success": false,
+                      "message": "Validation failed.",
+                      "data": {
+                        "errors": ["fields.documentType must be one of: national_id, passport, drivers_license"]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Route not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "Route not found.",
+                  "data": null
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error during OCR processing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "Internal Server Error.",
+                  "data": null
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "nullable": true
+          }
+        }
+      },
+      "SigningPayload": {
+        "type": "object",
+        "required": ["function", "fields"],
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["SIGNING"]
+          },
+          "fields": {
+            "$ref": "#/components/schemas/SigningFields"
+          },
+          "comparisonData": {
+            "$ref": "#/components/schemas/SigningComparisonData"
+          }
+        }
+      },
+      "SigningFields": {
+        "type": "object",
+        "required": ["signerName"],
+        "properties": {
+          "signerName": {
+            "type": "string",
+            "description": "The name of the expected signer to search for in the document.",
+            "example": "John Doe"
+          },
+          "expectedDate": {
+            "type": "string",
+            "description": "The expected signing date.",
+            "example": "15/01/2026"
+          }
+        }
+      },
+      "SigningComparisonData": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name to compare against the document content.",
+            "example": "John Doe"
+          },
+          "date": {
+            "type": "string",
+            "description": "Date to compare against extracted dates.",
+            "example": "15/01/2026"
+          }
+        }
+      },
+      "SigningResult": {
+        "type": "object",
+        "properties": {
+          "signatureDetected": {
+            "type": "boolean",
+            "description": "Whether a signature was detected in the document."
+          },
+          "signatureConfidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Confidence score for signature detection (0-1)."
+          },
+          "signerNameFound": {
+            "type": "boolean",
+            "description": "Whether the specified signer name was found in the document text."
+          },
+          "dateFound": {
+            "type": "boolean",
+            "description": "Whether a date pattern was found in the document."
+          },
+          "extractedSignerName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The signer name if found, null otherwise."
+          },
+          "extractedDate": {
+            "type": "string",
+            "nullable": true,
+            "description": "The first date pattern found in the document, null if none."
+          },
+          "comparisonResult": {
+            "type": "object",
+            "description": "Present only when comparisonData was provided in the request.",
+            "properties": {
+              "nameMatch": {
+                "type": "boolean"
+              },
+              "dateMatch": {
+                "type": "boolean"
+              },
+              "overallMatch": {
+                "type": "boolean",
+                "description": "True only if name matches, date matches, and signature is detected."
+              }
+            }
+          }
+        }
+      },
+      "SigningResponseData": {
+        "type": "object",
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["SIGNING"]
+          },
+          "result": {
+            "$ref": "#/components/schemas/SigningResult"
+          }
+        }
+      },
+      "IdVerificationPayload": {
+        "type": "object",
+        "required": ["function", "fields"],
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["ID_VERIFICATION"]
+          },
+          "fields": {
+            "$ref": "#/components/schemas/IdVerificationFields"
+          },
+          "comparisonData": {
+            "$ref": "#/components/schemas/IdVerificationComparisonData"
+          }
+        }
+      },
+      "IdVerificationFields": {
+        "type": "object",
+        "required": ["documentType"],
+        "properties": {
+          "documentType": {
+            "type": "string",
+            "enum": ["national_id", "passport", "drivers_license"],
+            "description": "The type of ID document being verified."
+          }
+        }
+      },
+      "IdVerificationComparisonData": {
+        "type": "object",
+        "required": ["fullName"],
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "Full name to compare against the extracted name.",
+            "example": "Jane Smith"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "description": "Date of birth to compare. Flexible format matching.",
+            "example": "15/03/1990"
+          },
+          "idNumber": {
+            "type": "string",
+            "description": "ID number to compare (exact match).",
+            "example": "A12345678"
+          }
+        }
+      },
+      "IdVerificationResult": {
+        "type": "object",
+        "properties": {
+          "extractedName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Name extracted from the ID document."
+          },
+          "extractedDateOfBirth": {
+            "type": "string",
+            "nullable": true,
+            "description": "Date of birth extracted from the ID document."
+          },
+          "extractedIdNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "ID number extracted from the document."
+          },
+          "extractedDocumentType": {
+            "type": "string",
+            "nullable": true,
+            "description": "The document type as specified in the request."
+          },
+          "rawText": {
+            "type": "string",
+            "description": "The full raw text extracted from the document."
+          },
+          "comparisonResult": {
+            "type": "object",
+            "description": "Present only when comparisonData was provided.",
+            "properties": {
+              "nameMatch": {
+                "type": "boolean"
+              },
+              "dobMatch": {
+                "type": "boolean"
+              },
+              "idNumberMatch": {
+                "type": "boolean"
+              },
+              "overallMatch": {
+                "type": "boolean",
+                "description": "True only if all provided comparison fields match."
+              }
+            }
+          }
+        }
+      },
+      "IdVerificationResponseData": {
+        "type": "object",
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["ID_VERIFICATION"]
+          },
+          "result": {
+            "$ref": "#/components/schemas/IdVerificationResult"
+          }
+        }
+      },
+      "DocumentClassificationPayload": {
+        "type": "object",
+        "required": ["function", "fields"],
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["DOCUMENT_CLASSIFICATION"]
+          },
+          "fields": {
+            "$ref": "#/components/schemas/DocumentClassificationFields"
+          }
+        }
+      },
+      "DocumentClassificationFields": {
+        "type": "object",
+        "properties": {
+          "expectedType": {
+            "type": "string",
+            "description": "Optional hint for the expected document type. Supported types: letter_of_recommendation, code_of_conduct, photo_media_consent, disclaimer_indemnity.",
+            "example": "code_of_conduct"
+          }
+        }
+      },
+      "DocumentClassificationResult": {
+        "type": "object",
+        "properties": {
+          "detectedType": {
+            "type": "string",
+            "nullable": true,
+            "description": "The detected document type, or null if confidence is too low. Possible values: letter_of_recommendation, code_of_conduct, photo_media_consent, disclaimer_indemnity.",
+            "example": "code_of_conduct"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Classification confidence score (0-1)."
+          },
+          "matchedKeywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The keywords from the document that matched the detected type."
+          },
+          "pages": {
+            "type": "integer",
+            "description": "Number of pages in the document."
+          },
+          "extractionMethod": {
+            "type": "string",
+            "enum": ["text", "ocr"],
+            "description": "Whether text was extracted directly or via OCR."
+          }
+        }
+      },
+      "DocumentClassificationResponseData": {
+        "type": "object",
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["DOCUMENT_CLASSIFICATION"]
+          },
+          "result": {
+            "$ref": "#/components/schemas/DocumentClassificationResult"
+          }
+        }
+      },
+      "FormDataExtractionPayload": {
+        "type": "object",
+        "required": ["function", "fields"],
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["FORM_DATA_EXTRACTION"]
+          },
+          "fields": {
+            "$ref": "#/components/schemas/FormDataExtractionFields"
+          }
+        }
+      },
+      "FormDataExtractionFields": {
+        "type": "object",
+        "properties": {
+          "targetFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional list of specific field names to extract. If omitted, all detected key-value pairs are returned.",
+            "example": ["Name", "Email", "Phone"]
+          }
+        }
+      },
+      "FormDataExtractionResult": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Extracted key-value pairs from the form.",
+            "example": {
+              "Name": "John Doe",
+              "Email": "john@example.com"
+            }
+          },
+          "rawText": {
+            "type": "string",
+            "description": "The full raw text extracted from the document."
+          },
+          "pages": {
+            "type": "integer",
+            "description": "Number of pages in the document."
+          },
+          "extractionMethod": {
+            "type": "string",
+            "enum": ["text", "ocr"]
+          }
+        }
+      },
+      "FormDataExtractionResponseData": {
+        "type": "object",
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["FORM_DATA_EXTRACTION"]
+          },
+          "result": {
+            "$ref": "#/components/schemas/FormDataExtractionResult"
+          }
+        }
+      },
+      "ReceiptParsingPayload": {
+        "type": "object",
+        "required": ["function", "fields"],
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["RECEIPT_PARSING"]
+          },
+          "fields": {
+            "$ref": "#/components/schemas/ReceiptParsingFields"
+          }
+        }
+      },
+      "ReceiptParsingFields": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "Expected currency code. If provided, overrides auto-detected currency.",
+            "example": "NGN"
+          }
+        }
+      },
+      "ReceiptParsingResult": {
+        "type": "object",
+        "properties": {
+          "vendor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Detected vendor or merchant name."
+          },
+          "date": {
+            "type": "string",
+            "nullable": true,
+            "description": "Date found on the receipt."
+          },
+          "totalAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "The total amount extracted from the receipt."
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true,
+            "description": "Detected or specified currency code."
+          },
+          "lineItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Individual line items parsed from the receipt."
+          },
+          "taxAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tax/VAT amount if found."
+          },
+          "rawText": {
+            "type": "string",
+            "description": "The full raw text extracted from the document."
+          }
+        }
+      },
+      "ReceiptParsingResponseData": {
+        "type": "object",
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["RECEIPT_PARSING"]
+          },
+          "result": {
+            "$ref": "#/components/schemas/ReceiptParsingResult"
+          }
+        }
+      },
+      "TextExtractionPayload": {
+        "type": "object",
+        "required": ["function", "fields"],
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["TEXT_EXTRACTION"]
+          },
+          "fields": {
+            "$ref": "#/components/schemas/TextExtractionFields"
+          }
+        }
+      },
+      "TextExtractionFields": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string",
+            "description": "Tesseract language code for OCR fallback. Defaults to 'eng'.",
+            "example": "eng",
+            "default": "eng"
+          }
+        }
+      },
+      "TextExtractionResult": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The extracted text content from the document."
+          },
+          "pages": {
+            "type": "integer",
+            "description": "Number of pages in the document."
+          },
+          "extractionMethod": {
+            "type": "string",
+            "enum": ["text", "ocr"],
+            "description": "'text' if extracted directly from PDF, 'ocr' if Tesseract was used."
+          }
+        }
+      },
+      "TextExtractionResponseData": {
+        "type": "object",
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["TEXT_EXTRACTION"]
+          },
+          "result": {
+            "$ref": "#/components/schemas/TextExtractionResult"
+          }
+        }
+      }
+    }
+  }
+}
