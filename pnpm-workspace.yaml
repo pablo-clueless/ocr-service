@@ -1,0 +1,4 @@
+allowBuilds:
+  "@scarf/scarf": true
+  msgpackr-extract: true
+  tesseract.js: true

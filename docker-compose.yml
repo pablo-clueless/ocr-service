@@ -1,0 +1,87 @@
+# Local stack: the same image runs the API and the worker (12-factor X — dev/prod
+# parity). By default both point at whatever REDIS_URL / DATABASE_URL your .env
+# holds — which in this project are managed, external services (Aiven Valkey over
+# TLS, Prisma Postgres). No secrets or connection strings are hardcoded here; they
+# come from .env via `env_file`, and env.ts fails fast if a required one is missing.
+#
+#   docker compose up --build                      # api + worker → your .env services
+#   docker compose --profile local-infra up --build  # ...plus a throwaway local redis + postgres
+#   docker compose run --rm api node build/scripts/provision-tenant.js list
+#
+# To run fully local instead of managed: enable the `local-infra` profile AND point
+# REDIS_URL=redis://redis:6379 and DATABASE_URL=postgres://<POSTGRES_USER>:<POSTGRES_PASSWORD>@postgres:5432/<POSTGRES_DB>
+# in your .env (the in-network service names).
+
+services:
+  # --- Application (always on) ---------------------------------------------------
+  # env_file injects the whole .env into the container; `environment` then overrides
+  # only what must differ from a dev .env (NODE_ENV) or is fixed by the topology (PORT).
+  api:
+    build: .
+    image: ocr-service
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+        required: false
+      postgres:
+        condition: service_healthy
+        required: false
+
+  worker:
+    build: .
+    image: ocr-service
+    command: ["node", "build/worker.js"]
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    depends_on:
+      redis:
+        condition: service_healthy
+        required: false
+      postgres:
+        condition: service_healthy
+        required: false
+
+  # --- Optional local infra (profile: local-infra) -------------------------------
+  # Throwaway Redis + Postgres for a fully-local stack with no managed services.
+  # Not started by a plain `docker compose up`. These are DISPOSABLE local container
+  # credentials, not the app's real secret — the real database is the managed
+  # DATABASE_URL in your .env. So POSTGRES_* keep conventional dev defaults (compose
+  # interpolates the whole file before applying profiles, so `:?` here would break the
+  # default managed flow too). Override them in .env if you like.
+  redis:
+    image: redis:7-alpine
+    profiles: ["local-infra"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["local-infra"]
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-heirs_ocr}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-heirs_ocr}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
